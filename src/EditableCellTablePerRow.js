@@ -40,8 +40,22 @@ const EditableCell = ({
           type="number"
           value={value}
           onChange={onChange}
-          onBlur={onBlur}
+          onKeyDown={onBlur}
           min={1}
+          size={Csize || 30}
+          style={{
+            textAlign: "left",
+          }}
+        />
+      );
+      break;
+    case "pass":
+      return (
+        <input
+          type="password"
+          value={value}
+          onChange={onChange}
+          onKeyDown={onBlur}
           size={Csize || 30}
           style={{
             textAlign: "left",
@@ -73,7 +87,7 @@ const EditableCell = ({
           type="text"
           value={value}
           onChange={onChange}
-          onBlur={onBlur}
+          onKeyDown={onBlur}
           size={Csize}
         />
       );
@@ -87,7 +101,7 @@ const defaultColumn = {
 };
 
 // Be sure to pass our updateMyData and the skipPageReset option
-function EditableCellTable({
+function EditableCellTablePerRow({
   columns,
   data,
   updateMyData,
@@ -204,10 +218,10 @@ function EditableCellTable({
         </select>
         &nbsp;
         <button onClick={() => addNewRow()}>{"+ Add Row"}</button> &nbsp;
-        <button onClick={() => masterSave()}>{"Save Changes"}</button>{" "}
+        {/*  <button onClick={() => masterSave()}>{"Save Changes"}</button>{" "} */}
       </div>
     </>
   );
 }
 
-export default EditableCellTable;
+export default EditableCellTablePerRow;

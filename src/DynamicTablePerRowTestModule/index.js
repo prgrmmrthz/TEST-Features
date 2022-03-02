@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
+import Joi from "joi";
 
 import makeData from "./makeData";
-import EditableCellTable from "../EditableCellTable";
+import EditableCellTablePerRow from "../EditableCellTablePerRow";
 import api from "../api2";
 import { userColumn } from "./columns";
 import Swal from "sweetalert2";
@@ -47,10 +48,11 @@ const Styles = styled.div`
   } */
 `;
 
-function DynamicTableTestModule() {
+function DynamicTablePerRowTestModule() {
   const [loading, setLoading] = useState(false);
   const [Userdata, setUserData] = useState([]);
   const [formValues, setFormValues] = useState({});
+  const [toSaveFields, setToSaveFields] = useState({});
   const [refId, setrefId] = useState(0);
   const [mode, setmode] = useState(1);
 
@@ -60,7 +62,7 @@ function DynamicTableTestModule() {
 
   const retrieveData = async () => {
     setLoading(true);
-    let q = "Template/GetTemplateById?templateId=9F Training Room 123";
+    let q = "User";
     const response = await api.get(q).catch((err) => {
       setLoading(false);
 
@@ -73,7 +75,7 @@ function DynamicTableTestModule() {
       console.debug(response.data);
       setLoading(false);
       if (response.data) {
-        setUserData(response.data[0].items || []);
+        setUserData(response.data || []);
       }
     }
   };
@@ -93,18 +95,7 @@ function DynamicTableTestModule() {
   const updateMyData = (rowIndex, columnId, value, e) => {
     // We also turn on the flag to not reset the page
     //e.preventDefault();
-    console.debug(rowIndex, columnId, value);
-
-    var reg = /^[0-9.]+$/;
-    if (columnId === "quantity" || columnId === "unitPrice") {
-      if (!value.match(reg)) {
-        alert("please input positive numbers only!");
-        value = "";
-        e.target.value = "";
-      }
-
-      setSkipPageReset(true);
-    }
+    // console.debug(rowIndex, columnId, value);
 
     setSkipPageReset(true);
     setUserData((old) =>
@@ -118,38 +109,18 @@ function DynamicTableTestModule() {
         return row;
       })
     );
-
-    setUserData((old) =>
-      old.map((row, index) => {
-        if (index === rowIndex) {
-          return {
-            ...old[rowIndex],
-            amount: (
-              Number(old[rowIndex].quantity) * Number(old[rowIndex].unitPrice)
-            ).toString(),
-          };
-        }
-        return row;
-      })
-    );
   };
 
   const AddNewRow = () => {
     const a = {
-      lineNumber: Userdata.length
-        ? (Number(Userdata[Userdata.length - 1].lineNumber) + 1).toString()
-        : "1",
-      description: "",
-      quantity: "",
-      unitPrice: "",
-      currency: "PhP",
-      amount: "",
-      templateId: "",
-      quantity_Numeric: 0,
-      unitPrice_Numeric: 0,
-      amount_Numeric: 0,
+      id: 0,
+      emp_id: "",
+      name: "",
+      user_name: "",
+      email: "",
+      user_type: 2,
     };
-    setUserData([...Userdata, a]);
+    setUserData([...Userdata, { ...a }]);
   };
 
   const MasterSave = async () => {
@@ -196,10 +167,85 @@ function DynamicTableTestModule() {
     var array = [...Userdata]; // make a separate copy of the array
     if (i !== -1) {
       array.splice(i, 1);
-      const updatedData = array.map((v, ind) => {
-        return { ...v, lineNumber: (ind + 1).toString() }; 
-      });
-      setUserData([...updatedData]);
+      setUserData([...array]);
+    }
+  };
+
+  const onSavePerRow = async (data) => {
+    //console.debug(data);
+    const schema = Joi.object({
+      emp_id: Joi.string().min(5).max(30).required(),
+      pword: Joi.string().min(5).max(50).required(),
+      name: Joi.string().min(5).max(40).required(),
+      user_name: Joi.string().min(3).max(30).required(),
+      id: Joi.number().min(0).required(),
+      user_type: Joi.number().min(1).max(2),
+      email: Joi.string().email({ minDomainSegments: 2, tlds: false }),
+    });
+    try {
+      const value = await schema.validateAsync(data);
+      console.debug(value);
+      let response;
+      if (value) {
+        if (value.id === 0) {
+          response = await api.post("User", value).catch((err) => {
+            setLoading(false);
+            console.error("error Insert User", err.response);
+            if (err.response) {
+              if (err.response.status === 400) {
+                Swal.fire({
+                  icon: "danger",
+                  text: err.response,
+                });
+              }
+            }
+          }); //response insert
+        } else if (value.id > 0) {
+          response = await api.put("User", value).catch((err) => {
+            setLoading(false);
+            console.error("error Update User", err.response);
+            if (err.response) {
+              if (err.response.status === 400) {
+                Swal.fire({
+                  icon: "danger",
+                  text: err.response,
+                });
+              }
+            }
+          });
+        } //if else mode insert or update
+
+        if (response) {
+          //console.debug(response);
+          setLoading(false);
+          if (response) {
+            if (response.status === 200 && response.data > 0) {
+              Swal.fire({
+                icon: "success",
+                title: "Success!",
+                text: "Record Updated!.",
+              }).then(() => {
+                retrieveData();
+              });
+  
+            } else if (response.status === 200 && response.data === -1) {
+              Swal.fire({
+                icon: "warning",
+                title: "Duplicated!",
+                text: `Employee ID: ${value.emp_id} already exist.`,
+              });
+            } else if (response.status === 200 && response.data === -2) {
+              Swal.fire({
+                icon: "warning",
+                title: "Duplicated!",
+                text: `Username: ${value.user_name} already exist.`,
+              });
+            }
+          }
+        }//if else response
+      }
+    } catch (err) {
+      Swal.fire(JSON.stringify(err.details[0].message));
     }
   };
 
@@ -217,7 +263,7 @@ function DynamicTableTestModule() {
   return (
     <Styles>
       {/* <button onClick={resetData}>Reset Data</button> */}
-      <EditableCellTable
+      <EditableCellTablePerRow
         columns={[
           ...columns,
           {
@@ -233,6 +279,13 @@ function DynamicTableTestModule() {
             Cell: ({ row }) => (
               <div>
                 <button
+                  className="mr-2 btn-transition btn btn-sm btn-outline-success"
+                  onClick={() => onSavePerRow(row.original)}
+                >
+                  Save
+                </button>
+                &nbsp;
+                <button
                   className="mr-2 btn-transition btn btn-sm btn-outline-danger"
                   onClick={() => handleDelete(row.index)}
                 >
@@ -242,7 +295,7 @@ function DynamicTableTestModule() {
             ),
           },
         ]}
-        data={Userdata}
+        data={[...Userdata]}
         updateMyData={updateMyData}
         skipPageReset={skipPageReset}
         addNewRow={AddNewRow}
@@ -254,4 +307,4 @@ function DynamicTableTestModule() {
   );
 }
 
-export default DynamicTableTestModule;
+export default DynamicTablePerRowTestModule;
